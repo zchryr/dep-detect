@@ -1,0 +1,36 @@
+name: "CI - CodeQL"
+
+on:
+  push:
+    branches: [ "main" ] # Runs on pushes to the main branch.
+  pull_request:
+    branches: [ "main" ] # Runs on pull requests targeting the main branch.
+  workflow_dispatch: # Allows manual triggering of the workflow.
+
+jobs:
+  analyze:
+    name: Analyze (Python)
+    runs-on: 'ubuntu-latest'
+
+    permissions:
+      # Required for all workflows that upload security results.
+      security-events: write
+
+      # Required to fetch internal or private CodeQL packs from GitHub Packages.
+      packages: read
+
+      # Required for workflows in private repositories to read repository content and actions.
+      actions: read
+      contents: read
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: 'python'
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
