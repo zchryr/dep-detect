@@ -1,0 +1,5 @@
+# No external dependencies required
+# This script only uses Python standard library modules
+requests==2.31.0
+pytest==7.4.0
+black==23.7.0
