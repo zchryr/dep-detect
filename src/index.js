@@ -19,6 +19,12 @@ const MANIFEST_PATTERNS = {
   rust: ['Cargo.toml', 'Cargo.lock']
 };
 
+function isManifestFile(filename) {
+  return Object.values(MANIFEST_PATTERNS)
+    .flat()
+    .some(pattern => filename.endsWith(pattern));
+}
+
 // Function to parse different manifest file formats
 async function parseManifestFile(content, filename) {
   try {
@@ -68,6 +74,21 @@ function extractDependencies(parsedContent, filename) {
   return dependencies;
 }
 
+async function getFileContent(octokit, owner, repo, path, ref) {
+  try {
+    const { data: fileContent } = await octokit.rest.repos.getContent({
+      owner,
+      repo,
+      path,
+      ref
+    });
+    return Buffer.from(fileContent.content, 'base64').toString();
+  } catch (error) {
+    // File may not exist in base branch (for added files)
+    return null;
+  }
+}
+
 async function run() {
   try {
     const token = core.getInput('github-token');
@@ -81,47 +102,49 @@ async function run() {
 
     const { owner, repo } = context.repo;
     const pull_number = context.payload.pull_request.number;
+    const base_sha = context.payload.pull_request.base.sha;
+    const head_sha = context.payload.pull_request.head.sha;
 
-    // Get the diff of the PR
-    const { data: diff } = await octokit.rest.pulls.get({
-      owner,
-      repo,
-      pull_number,
-      mediaType: {
-        format: 'diff'
-      }
-    });
-
-    // Process the diff to find changed manifest files
-    const changedFiles = diff.split('\n')
-      .filter(line => line.startsWith('diff --git'))
-      .map(line => line.split(' ')[2].substring(2));
+    // Get the list of changed files in the PR
+    const changedFiles = await octokit.paginate(
+      octokit.rest.pulls.listFiles,
+      { owner, repo, pull_number },
+      (response) => response.data
+    );
 
     const newDependencies = new Map();
 
     for (const file of changedFiles) {
-      // Check if the file is a manifest file
-      const isManifest = Object.values(MANIFEST_PATTERNS)
-        .flat()
-        .some(pattern => file.endsWith(pattern));
+      if (!isManifestFile(file.filename)) continue;
 
-      if (isManifest) {
-        // Get the file content
-        const { data: fileContent } = await octokit.rest.repos.getContent({
-          owner,
-          repo,
-          path: file,
-          ref: context.payload.pull_request.head.sha
-        });
-
-        const content = Buffer.from(fileContent.content, 'base64').toString();
-        const parsedContent = await parseManifestFile(content, file);
-        const dependencies = extractDependencies(parsedContent, file);
-
-        if (dependencies.size > 0) {
-          newDependencies.set(file, Array.from(dependencies));
+      // Get file status: added, modified, removed, renamed
+      if (file.status === 'added') {
+        // All dependencies in the new file are net-new
+        const content = await getFileContent(octokit, owner, repo, file.filename, head_sha);
+        if (content) {
+          const parsedContent = await parseManifestFile(content, file.filename);
+          const dependencies = extractDependencies(parsedContent, file.filename);
+          if (dependencies.size > 0) {
+            newDependencies.set(file.filename, Array.from(dependencies));
+          }
+        }
+      } else if (file.status === 'modified') {
+        // Compare base and head
+        const baseContent = await getFileContent(octokit, owner, repo, file.filename, base_sha);
+        const headContent = await getFileContent(octokit, owner, repo, file.filename, head_sha);
+        if (baseContent && headContent) {
+          const baseParsed = await parseManifestFile(baseContent, file.filename);
+          const headParsed = await parseManifestFile(headContent, file.filename);
+          const baseDeps = extractDependencies(baseParsed, file.filename);
+          const headDeps = extractDependencies(headParsed, file.filename);
+          // Net-new = in head, not in base
+          const netNew = Array.from(headDeps).filter(dep => !baseDeps.has(dep));
+          if (netNew.length > 0) {
+            newDependencies.set(file.filename, netNew);
+          }
         }
       }
+      // Ignore removed/renamed for now
     }
 
     // Output the results
