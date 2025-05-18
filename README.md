@@ -1,69 +1,51 @@
-# Dependency Detection GitHub Action
+# Git Diff Detector
 
-This GitHub Action detects new dependencies added in pull requests across various programming languages and package managers.
+A simple Python script that detects changes in your git repository.
 
 ## Features
 
-- Detects new dependencies in pull requests
-- Supports multiple programming languages and package managers:
-  - Python (requirements.txt, Pipfile, pyproject.toml)
-  - JavaScript/TypeScript (package.json, yarn.lock, etc.)
-  - Java (pom.xml, build.gradle)
-  - C# (.csproj, packages.config)
-  - PHP (composer.json)
-  - C++ (conanfile.txt, vcpkg.json)
-  - Go (go.mod)
-  - Ruby (Gemfile)
-  - Kotlin (build.gradle, pom.xml)
-  - Swift (Package.swift, Podfile)
-  - Rust (Cargo.toml)
+- Detects changed files in your current branch compared to the main branch
+- Shows file status (Added, Modified, Deleted)
+- Simple and lightweight - no external dependencies required
+- Easy to test and verify changes
 
 ## Usage
 
-Add the following to your workflow file (e.g., `.github/workflows/dependency-check.yml`):
+1. Make sure you have Python 3.6+ installed
+2. Clone this repository
+3. Run the script:
 
-```yaml
-name: Check Dependencies
-
-on:
-  pull_request:
-    types: [opened, synchronize]
-
-jobs:
-  check-dependencies:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check for new dependencies
-        uses: zchryr/dependency-detection-action@v1
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+```bash
+python git_diff_detector.py
 ```
 
-## Outputs
+## Output
 
-The action provides the following outputs:
-
-- `new_dependencies`: A formatted string containing information about newly added dependencies, organized by file.
-
-## Example Output
+The script will output a list of changed files with their status:
 
 ```
-New dependencies detected:
-
-package.json:
-  - lodash
-  - express
-
-requirements.txt:
-  - requests
-  - pytest
+Changed files:
+A       new_file.txt
+M       modified_file.py
+D       deleted_file.js
 ```
 
-## Contributing
+Where:
+- `A` means the file was Added
+- `M` means the file was Modified
+- `D` means the file was Deleted
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+## Development
+
+This script uses only Python standard library modules, so there are no external dependencies to install.
+
+## Testing
+
+To test the script:
+1. Make some changes to files
+2. Run the script to see the changes
+3. Verify the output matches your changes
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT
