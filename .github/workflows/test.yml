@@ -22,6 +22,12 @@ jobs:
         run: npm run build
 
       - name: Check for new dependencies
+        id: check-dependencies
         uses: ./
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Print detected dependencies
+        run: |
+          echo "Detected dependencies:"
+          echo "${{ steps.check-dependencies.outputs.new_dependencies }}"
